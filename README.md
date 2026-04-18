@@ -2,7 +2,7 @@
 
 Telegram bot that sends a random fox image on `/fox` command.
 
-Images sourced from [wohlsoft.ru/images/foxybot/foxes](https://wohlsoft.ru/images/foxybot/foxes/).
+Images sourced from [NotiLo-A/foxbot/foxes](https://github.com/NotiLo-A/foxbot/tree/main/foxes).
 
 <img src="screenshot.png" width="360">
 

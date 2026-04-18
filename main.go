@@ -12,19 +12,22 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"regexp"
 	"sync"
 	"time"
 )
 
 const (
-	foxBase         = "https://wohlsoft.ru/images/foxybot/foxes/"
+	githubAPI       = "https://api.github.com/repos/NotiLo-A/foxbot/contents/foxes"
+	githubRaw       = "https://raw.githubusercontent.com/NotiLo-A/foxbot/main/foxes/"
 	pollTimeout     = 30
 	refreshInterval = time.Hour
 	workers         = 4
 )
 
-var imgRe = regexp.MustCompile(`class="indexcolname"><a href="([^"./][^"]*)"`)
+type githubFile struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
 
 type cache struct {
 	mu  sync.RWMutex
@@ -32,25 +35,36 @@ type cache struct {
 }
 
 func (c *cache) refresh(client *http.Client) error {
-	resp, err := client.Get(foxBase)
+	req, err := http.NewRequest("GET", githubAPI, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("github api: status %d", resp.StatusCode)
+	}
+
+	var files []githubFile
+	if err := json.NewDecoder(resp.Body).Decode(&files); err != nil {
 		return err
 	}
 
-	indices := imgRe.FindAllSubmatchIndex(body, -1)
-	seen := make(map[string]struct{}, len(indices))
-	imgs := make([]string, 0, len(indices))
-	for _, idx := range indices {
-		s := string(body[idx[2]:idx[3]])
-		if _, ok := seen[s]; !ok {
-			seen[s] = struct{}{}
-			imgs = append(imgs, foxBase+s)
+	imgs := make([]string, 0, len(files))
+	for _, f := range files {
+		if f.Type == "file" {
+			imgs = append(imgs, githubRaw+f.Name)
 		}
+	}
+
+	if len(imgs) == 0 {
+		return fmt.Errorf("no files found")
 	}
 
 	c.mu.Lock()
